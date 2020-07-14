@@ -185,9 +185,14 @@ class Connection
             $this->redirectForAuthorization();
         }
 
-        // If access token is not set or token has expired, acquire new token
-        if (empty($this->accessToken) || $this->tokenHasExpired()) {
+        // If access token is not set, acquire new token
+        if (empty($this->accessToken)) {
             $this->acquireAccessToken();
+        }
+
+        // If token has expired, throw exception
+        if ($this->tokenHasExpired()) {
+            throw new ApiException('Token has expired');
         }
 
         $client = $this->client();
@@ -213,9 +218,14 @@ class Connection
             'Prefer'       => 'return=representation',
         ]);
 
-        // If access token is not set or token has expired, acquire new token
-        if (empty($this->accessToken) || $this->tokenHasExpired()) {
+        // If access token is not set, acquire new token
+        if (empty($this->accessToken)) {
             $this->acquireAccessToken();
+        }
+
+        // If token has expired, throw exception
+        if ($this->tokenHasExpired()) {
+            throw new ApiException('Token has expired');
         }
 
         // If we have a token, sign the request
@@ -472,7 +482,7 @@ class Connection
         return $this->accessToken;
     }
 
-    private function acquireAccessToken()
+    private function acquireAccessToken($refresh = false)
     {
         try {
             if (is_callable($this->acquireAccessTokenLockCallback)) {
@@ -490,7 +500,7 @@ class Connection
                         'code'          => $this->authorizationCode,
                     ],
                 ];
-            } else { // else do refresh token request
+            } elseif ($refresh) { // else do refresh token request
                 $body = [
                     'form_params' => [
                         'refresh_token' => $this->refreshToken,
@@ -499,6 +509,8 @@ class Connection
                         'client_secret' => $this->exactClientSecret,
                     ],
                 ];
+            } else {
+                throw new ApiException('Could not acquire or refresh tokens');
             }
 
             $response = $this->client()->post($this->getTokenUrl(), $body);
